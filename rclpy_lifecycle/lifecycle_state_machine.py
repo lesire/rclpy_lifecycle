@@ -8,8 +8,7 @@ class LifecycleStateMachine:
 
     def __init__(self):
         self.__states = dict()
-        self.__transitions = dict()
-        self.__transitions_by_label = dict()
+        self.__transitions = list()
         self.__valid_transitions = defaultdict(list)
         self.__current_state = State.PRIMARY_STATE_UNKNOWN
 
@@ -28,8 +27,7 @@ class LifecycleStateMachine:
         elif transition.goal_state.id not in self.__states:
             # goal state not registered
             return False
-        self.__transitions[transition.transition.id] = transition.transition
-        self.__transitions_by_label[transition.transition.label] = transition.transition
+        self.__transitions.append(transition.transition)
         self.__valid_transitions[transition.start_state.id].append(transition)
         return True
 
@@ -43,16 +41,16 @@ class LifecycleStateMachine:
         return list(self.__states.values())
 
     def get_transitions(self) -> List[Transition]:
-        return list(self.__transitions.values())
+        return self.__transitions
 
     def get_valid_transitions(self, state_id: int) -> List[TransitionDescription]:
         return self.__valid_transitions[state_id]
 
-    def get_transition(self, transition_id: int) -> Transition:
-        return self.__transitions[transition_id]
+    def get_transition_by_id(self, state_id: int, transition_id: int) -> TransitionDescription:
+        return next(t for t in self.__valid_transitions[state_id] if t.transition.id == transition_id)
 
-    def get_transition_by_label(self, label: str) -> Transition:
-        return self.__transitions_by_label[label]
+    def get_transition_by_label(self, state_id: int, label: str) -> TransitionDescription:
+        return next(t for t in self.__valid_transitions[state_id] if t.transition.label == label)
 
     def trigger_transition(self, transition: Transition) -> bool:
         valid_transitions = self.__valid_transitions[self.__current_state]

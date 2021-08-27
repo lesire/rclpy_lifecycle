@@ -1,11 +1,14 @@
 from rclpy.node import Node
 from rclpy.qos import qos_profile_services_default, qos_profile_action_status_default
 from lifecycle_msgs.srv import ChangeState, GetState, GetAvailableStates, GetAvailableTransitions
-from lifecycle_msgs.msg import TransitionEvent, State, Transition
+from lifecycle_msgs.msg import TransitionEvent, State, Transition, TransitionDescription
 
-from .lifecycle_node import CallbackFunction
 from .lifecycle_state_machine import LifecycleStateMachine
 from .lifecycle_node_interface import LifecycleNodeInterface
+
+from typing import Callable
+CallbackFunction = Callable[[State], LifecycleNodeInterface.CallbackReturn]
+
 
 class LifecycleNodeImpl:
     def __init__(self, node: Node):
@@ -43,17 +46,25 @@ class LifecycleNodeImpl:
 
         self.__enable_communication_interface = enable_communication_interface
 
+    @property
+    def state_machine(self) -> LifecycleStateMachine:
+        return self.__state_machine
+
     def __on_change_state(self, request: ChangeState.Request, response: ChangeState.Response):
+        self.__node.get_logger().debug(f"[lifecycle] received change request {request}")
+        current_state_id = self.__state_machine.get_current_state().id
         if len(request.transition.label) > 0:
             try:
-                transition = self.__state_machine.get_transition_by_label(request.transition.label)
-                transition_id = transition.id
-            except:
+                transition = self.__state_machine.get_transition_by_label(current_state_id, request.transition.label)
+                transition_id = transition.transition.id
+            except Exception as ex:
+                self.__node.get_logger().error(f"{ex}")
                 response.success = False
                 return response
         else:
             transition_id = request.transition.id
-
+        self.__node.get_logger().debug(f"[lifecycle] transition id {transition_id}")
+        
         response.success = self.__change_state(transition_id)
         return response
 
@@ -71,10 +82,13 @@ class LifecycleNodeImpl:
         return response
 
     def __on_get_transition_graph(self, request: GetAvailableTransitions.Request, response: GetAvailableTransitions.Response):
-        response.available_transitions = self.__state_machine.get_transitions()
+        response.available_transitions = [t 
+            for s in self.__state_machine.get_states()
+            for t in self.__state_machine.get_valid_transitions(s.id) 
+            ]
         return response
 
-    def __publish_notification(self, start: State, goal: State, transition: Transition):
+    def __publish_notification(self, start: State, goal: State, transition: TransitionDescription):
         if self.__enable_communication_interface:
             msg = TransitionEvent()
             msg.start_state = start
@@ -84,13 +98,15 @@ class LifecycleNodeImpl:
 
     def register_callback(self, lifecycle_transition: int, cb: CallbackFunction) -> bool:
         self.__cb_map[lifecycle_transition] = cb
+        self.__node.get_logger().debug(f"[lifecycle] callback map {lifecycle_transition} -> {cb}")
         return True
 
     def __change_state(self, transition_id: int) -> bool:
         current_state = self.__state_machine.get_current_state()
         initial_state = State(id=current_state.id, label=current_state.label)
-        if not self.__trigger_transition_by_id(transition_id):
-            # impossible to start transition from current state
+        self.__node.get_logger().debug(f"[lifecycle] current state: {current_state}")
+        if not self.__trigger_transition_by_id(current_state.id, transition_id):
+            self.__node.get_logger().error(f"[lifecycle] impossible to start transition {transition_id} from current state {current_state}")
             return False
         cb_return_code = self.__execute_callback(self.__state_machine.get_current_state().id, initial_state)
         if cb_return_code == Transition.TRANSITION_CALLBACK_SUCCESS:
@@ -99,8 +115,10 @@ class LifecycleNodeImpl:
             transition_label = "transition_failure"
         else:
             transition_label = "transition_error"
-        if not self.__trigger_transition_by_label(transition_label):
+        current_state = self.__state_machine.get_current_state()
+        if not self.__trigger_transition_by_label(current_state.id, transition_label):
             # failed to finish transition
+            self.__node.get_logger().error(f"[lifecycle] failed to finish transition {transition_label}")
             return False
         # error handling
         if cb_return_code == LifecycleNodeInterface.CallbackReturn.ERROR:
@@ -111,34 +129,50 @@ class LifecycleNodeImpl:
                 error_label = "transition_failure"
             else:
                 error_label = "transition_error"
-            if not self.__trigger_transition_by_label(error_label):
-                # Failed to call cleanup on error state
+            current_state = self.__state_machine.get_current_state()
+            if not self.__trigger_transition_by_label(current_state.id, error_label):
+                self.__node.get_logger().error(f"[lifecycle] failed to call cleanup on error state with transition {error_label}")
                 return False
         # valid transition
         return True
 
-    def __trigger_transition_by_id(self, id: int) -> bool:
-        transition = self.__state_machine.get_transition(id)
-        return self.__trigger_transition(transition)
+    def __trigger_transition_by_id(self, state_id: int, transition_id: int) -> bool:
+        try:
+            transition = self.__state_machine.get_transition_by_id(state_id, transition_id)
+        except StopIteration:
+            self.__node.get_logger().debug(f"transition {transition_id} does not exist from state {state_id}")
+            return False
+        return self.__trigger_transition(transition.transition)
 
-    def __trigger_transition_by_label(self, label: str) -> bool:
-        transition = self.__state_machine.get_transition_by_label(label)
-        return self.__trigger_transition(transition)
+    def __trigger_transition_by_label(self, state_id: int, transition_label: str) -> bool:
+        try:
+            transition = self.__state_machine.get_transition_by_label(state_id, transition_label)
+        except StopIteration:
+            self.__node.get_logger().debug(f"transition {transition_label} does not exist from state {state_id}")
+            return False
+        return self.__trigger_transition(transition.transition)
 
     def __trigger_transition(self, transition: Transition) -> bool:
         start_state = self.__state_machine.get_current_state()
+        self.__node.get_logger().debug(f"[lifecycle] trigger transition {transition} from {start_state}")
         if self.__state_machine.trigger_transition(transition):
-            # publish
             goal_state = self.__state_machine.get_current_state()
+            self.__node.get_logger().debug(f"[lifecycle] goal state: {goal_state}")
+            # publish
             self.__publish_notification(start_state, goal_state, transition)
             return True
-        return False                
+        else:
+            self.__node.get_logger().debug(f"[lifecycle] error triggering transition {transition} from {start_state}")
+            return False
 
     def __execute_callback(self, cb_id: int, previous_state: State) -> LifecycleNodeInterface.CallbackReturn:
         cb_success = LifecycleNodeInterface.CallbackReturn.SUCCESS
         if cb_id in self.__cb_map:
             try:
+                self.__node.get_logger().debug(f"[lifecycle] executing callback {cb_id}:{self.__cb_map[cb_id]} from {previous_state}")
                 cb_success = self.__cb_map[cb_id](previous_state)
-            except:
+            except Exception as ex:
+                self.__node.get_logger().debug(f"[lifecycle] catched callback exception {ex}")
                 cb_success = LifecycleNodeInterface.CallbackReturn.ERROR
+        self.__node.get_logger().debug(f"[lifecycle] callback returned {cb_success}")
         return cb_success
