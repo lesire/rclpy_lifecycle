@@ -34,6 +34,7 @@ class LifecycleNode(Node, LifecycleNodeInterface):
         self.register_on_deactivate(self.on_deactivate)
         self.register_on_error(self.on_error)
 
+    '''
     def create_publisher(self, msg_type, topic: str, qos_profile, **options):
         """Create and return a Publisher.
         
@@ -45,34 +46,35 @@ class LifecycleNode(Node, LifecycleNodeInterface):
         """
         #TODO
         pass
+    '''
 
     def get_current_state(self) -> State:
         """Return the current State.
 
         @return: the current state
         """
-        return self.__impl.get_current_state()
+        return self.__impl.state_machine.get_current_state()
 
     def get_available_states(self) -> List[State]:
         """Return a list with the available states.
 
         @return list with the available states.
         """
-        return self.__impl.get_available_states()
+        return self.__impl.state_machine.get_available_states()
 
     def get_available_transitions(self) -> List[Transition]:
         """Return a list with the current available transitions.
 
         @return list with the current available transitions.
         """
-        return self.__impl.get_available_transitions()
+        return self.__impl.state_machine.get_available_transitions()
 
     def get_transition_graph(self) -> List[Transition]:
         """Return a list with the all the transitions.
 
         @return list with the all the transitions in the transition graph.
         """
-        return self.__impl.get_transition_graph()
+        return self.__impl.state_machine.get_transition_graph()
 
     def trigger_transition(self, 
                            transition: Union[int, Transition]) -> LifecycleNodeInterface.CallbackReturn:
@@ -81,9 +83,9 @@ class LifecycleNode(Node, LifecycleNodeInterface):
         @return: transition callback return code
         """
         if isinstance(transition, int):
-            return self.__impl.trigger_transition(transition)
+            return self.__impl.state_machine.trigger_transition(transition)
         elif isinstance(transition, Transition):
-            return self.__impl.trigger_transition(transition.id)
+            return self.__impl.state_machine.trigger_transition(transition.id)
         else:
             return LifecycleNodeInterface.CallbackReturn.ERROR
 
@@ -120,7 +122,7 @@ class LifecycleNode(Node, LifecycleNodeInterface):
 
         @return: transition callback return code
         """
-        return self.__impl.trigger_transition("shutdown")
+        return self.__impl.state_machine.trigger_transition("shutdown")
     
     def register_on_configure(self, fcn: CallbackFunction) -> bool:
         """Register the configure callback.
