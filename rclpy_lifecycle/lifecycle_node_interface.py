@@ -28,7 +28,7 @@ class LifecycleNodeInterface:
     def on_configure(self, previous_state: State) -> CallbackReturn:
         """Callback function for configure transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
 
@@ -36,7 +36,7 @@ class LifecycleNodeInterface:
     def on_cleanup(self, previous_state: State) -> CallbackReturn:
         """Callback function for cleanup transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
 
@@ -44,7 +44,7 @@ class LifecycleNodeInterface:
     def on_shutdown(self, previous_state: State) -> CallbackReturn:
         """Callback function for shutdown transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
 
@@ -52,7 +52,7 @@ class LifecycleNodeInterface:
     def on_activate(self, previous_state: State) -> CallbackReturn:
         """Callback function for activate transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
 
@@ -60,7 +60,7 @@ class LifecycleNodeInterface:
     def on_deactivate(self, previous_state: State) -> CallbackReturn:
         """Callback function for deactivate transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
 
@@ -68,6 +68,6 @@ class LifecycleNodeInterface:
     def on_error(self, previous_state: State) -> CallbackReturn:
         """Callback function for error transition.
 
-        @return: success by default
+        :return: success by default
         """
         return LifecycleNodeInterface.CallbackReturn.SUCCESS
