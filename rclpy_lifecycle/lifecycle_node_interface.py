@@ -18,6 +18,8 @@ class LifecycleNodeInterface:
     """
 
     class CallbackReturn(enum.IntEnum):
+        """An enumeration of the possible callback returns."""
+
         SUCCESS = Transition.TRANSITION_CALLBACK_SUCCESS
         FAILURE = Transition.TRANSITION_CALLBACK_FAILURE
         ERROR = Transition.TRANSITION_CALLBACK_ERROR
