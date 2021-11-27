@@ -16,9 +16,6 @@ class LifecycleNodeImpl:
         self.__cb_map = dict()
 
     def init(self, enable_communication_interface: bool = True):
-        # initialize state machine
-        self.__state_machine = LifecycleStateMachine.init_default_state_machine()
-
         if enable_communication_interface:
             # initialize change state service
             self.__srv_change_state = self.__node.create_service(ChangeState, 
@@ -45,6 +42,11 @@ class LifecycleNodeImpl:
                 "~/transition_event", qos_profile=qos_profile_action_status_default)
 
         self.__enable_communication_interface = enable_communication_interface
+        # initialize state machine
+        self.__state_machine = LifecycleStateMachine.init_default_state_machine()
+        # create
+        req = ChangeState.Request(transition = Transition(id=Transition.TRANSITION_CREATE, label='create'))
+        self.__on_change_state(req, ChangeState.Response())
 
     @property
     def state_machine(self) -> LifecycleStateMachine:

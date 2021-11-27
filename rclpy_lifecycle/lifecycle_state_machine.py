@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from collections import defaultdict
 
 from lifecycle_msgs.msg import State, Transition, TransitionDescription
@@ -9,7 +9,7 @@ class LifecycleStateMachine:
     def __init__(self):
         self.__states = dict()
         self.__transitions = list()
-        self.__valid_transitions = defaultdict(list)
+        self.__valid_transitions : Dict[int, List[TransitionDescription]] = defaultdict(list)
         self.__current_state = State.PRIMARY_STATE_UNKNOWN
 
     def register_state(self, state: State) -> bool:
@@ -105,6 +105,7 @@ class LifecycleStateMachine:
         state_machine.register_state(State(id=State.PRIMARY_STATE_INACTIVE, label="inactive"))
         state_machine.register_state(State(id=State.PRIMARY_STATE_ACTIVE, label="active"))
         state_machine.register_state(State(id=State.PRIMARY_STATE_FINALIZED, label="finalized"))
+        unknown_state = state_machine.get_state(State.PRIMARY_STATE_UNKNOWN)
         unconfigured_state = state_machine.get_state(State.PRIMARY_STATE_UNCONFIGURED)
         inactive_state = state_machine.get_state(State.PRIMARY_STATE_INACTIVE)
         active_state = state_machine.get_state(State.PRIMARY_STATE_ACTIVE)
@@ -125,6 +126,9 @@ class LifecycleStateMachine:
         shuttingdown_state = state_machine.get_state(State.TRANSITION_STATE_SHUTTINGDOWN)
         
         # register all transitions
+        ## register transition from unknown to unconfigured
+        state_machine.register_transition(TransitionDescription(transition=Transition(id=Transition.TRANSITION_CREATE, label="create"), start_state=unknown_state, goal_state=unconfigured_state))
+        state_machine.register_transition(TransitionDescription(transition=Transition(id=Transition.TRANSITION_CREATE, label="transition_success"), start_state=unconfigured_state, goal_state=unconfigured_state))
         ## register transition from unconfigured to configuring
         state_machine.register_transition(TransitionDescription(transition=Transition(id=Transition.TRANSITION_CONFIGURE, label="configure"), start_state=unconfigured_state, goal_state=configuring_state))
         ## register transition from configuring to inactive
@@ -177,5 +181,5 @@ class LifecycleStateMachine:
         state_machine.register_transition(TransitionDescription(transition=Transition(id=Transition.TRANSITION_ON_ERROR_ERROR, label="transition_error"), start_state=errorprocessing_state, goal_state=finalized_state))
         
         # set the initial state to unconfigured
-        state_machine.__current_state = State.PRIMARY_STATE_UNCONFIGURED
+        state_machine.__current_state = State.PRIMARY_STATE_UNKNOWN
         return state_machine

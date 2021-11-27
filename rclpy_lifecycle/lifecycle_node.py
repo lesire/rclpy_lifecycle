@@ -82,10 +82,10 @@ class LifecycleNode(Node, LifecycleNodeInterface):
 
         @return: transition callback return code
         """
-        if isinstance(transition, int):
+        if isinstance(transition, Transition):
             return self.__impl.state_machine.trigger_transition(transition)
         elif isinstance(transition, Transition):
-            return self.__impl.state_machine.trigger_transition(transition.id)
+            return self.__impl.state_machine.trigger_transition(Transition(id=transition))
         else:
             return LifecycleNodeInterface.CallbackReturn.ERROR
 
